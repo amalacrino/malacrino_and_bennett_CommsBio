@@ -85,10 +85,6 @@ library("MuMIn")
 ### Load and clean microbiome data
 
 ```r
-NTHREADS = 8
-
-'%ni%' <- Negate('%in%')
-
 asv.table <- as.matrix(read.table('data/ASV_table.tsv', sep = "\t", header = T, row.names = 1))
 tax.table <- as.matrix(read.table('data/ASV_tax_species.tsv', sep = "\t", header = T, row.names = 1)[,c(2:8)])
 mapping <- read.table('data/metadata.txt', sep = "\t", header = T, row.names = 1)
