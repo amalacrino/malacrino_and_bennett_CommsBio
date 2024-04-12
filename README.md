@@ -89,15 +89,6 @@ NTHREADS = 8
 
 '%ni%' <- Negate('%in%')
 
-create_dt <- function(x){
-  DT::datatable(x,
-                extensions = 'Buttons',
-                options = list(dom = 'Blfrtip',
-                               buttons = c('copy', 'csv', 'excel'),
-                               lengthMenu = list(c(10,25,50,-1),
-                                                 c(10,25,50,"All"))))
-}
-
 asv.table <- as.matrix(read.table('data/ASV_table.tsv', sep = "\t", header = T, row.names = 1))
 tax.table <- as.matrix(read.table('data/ASV_tax_species.tsv', sep = "\t", header = T, row.names = 1)[,c(2:8)])
 mapping <- read.table('data/metadata.txt', sep = "\t", header = T, row.names = 1)
@@ -107,12 +98,6 @@ ps.16S <- phyloseq(otu_table(asv.table, taxa_are_rows = T),
                          sample_data(mapping), 
                          tax_table(tax.table), 
                          phy_tree(tree))
-
-ps.16S.inoculum <- subset_samples(ps.16S, Treatment == "Inoculum")
-
-ps.16S <- subset_samples(ps.16S, Treatment != "Herbivore_artif_food") 
-ps.16S <- subset_samples(ps.16S, Treatment != "Inoculum") 
-ps.16S <- subset_samples(ps.16S, Treatment != "Sterile_soil") 
 
 ps.16S <- subset_taxa(ps.16S, Class !="Chloroplast")
 ps.16S <- subset_taxa(ps.16S, Order !="Chloroplast")
@@ -131,27 +116,12 @@ remove.cont <- function(ps){
   return(ps)
 }
 
-wrench.norm.ps <- function(ps){
-  count_tab <- as.matrix((data.frame(otu_table(ps))))
-  group <- sample_data(ps)$Compartment
-  W <- wrench(count_tab, condition=group)
-  norm_factors <- W$nf
-  head(norm_factors)
-  norm_counts <- sweep(count_tab, 2, norm_factors, FUN = '/')
-  norm_counts_trim <- data.frame(t(data.frame(norm_counts)))                                                  
-  norm_counts_trim[] <- lapply(norm_counts_trim, function(x) DescTools::Winsorize(x, probs = c(0, 0.97), type = 1))
-  norm_counts_trim <- data.frame(t(norm_counts_trim))
-  norm_counts_trim[norm_counts_trim == 0] <- 1
-  norm_counts_trim[norm_counts_trim < 0] <- 1
-  norm_counts_trim <- log2(norm_counts_trim)
-  colnames(norm_counts_trim) <- gsub("\\.", "-", colnames(norm_counts_trim))
-  ps_norm <- ps
-  otu_table(ps_norm) <- otu_table(norm_counts_trim, taxa_are_rows =  TRUE)
-  return(ps_norm)
-}
-
 ps.16S <- subset_samples(ps.16S, Compartment != "Control") 
 ps.16S <- subset_samples(ps.16S, Soil != "No_treatment") 
 ps.16S <- filter_taxa(ps.16S, function (x) {sum(x > 0) > 1}, prune=TRUE)
+ps.16S.L <- subset_samples(ps.16S, Compartment == "Leaves") 
+ps.16S.R <- subset_samples(ps.16S, Compartment == "Roots") 
+ps.16S.S <- subset_samples(ps.16S, Compartment == "Soil") 
+ps.16S.H <- subset_samples(ps.16S, Compartment == "Herbivore")
 ```
 
