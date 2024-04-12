@@ -49,9 +49,9 @@ FastTree -gtr -nt < asv_aligned.fasta > tree.tre
 ```
 
 
-## Data analysis
+# Data analysis
 
-### Load libraries
+## Load libraries
 
 ```r
 library("phyloseq")
@@ -82,7 +82,7 @@ library("data.table")
 library("MuMIn")
 ```
 
-### Load and clean microbiome data
+## Load and clean microbiome data
 
 ```r
 asv.table <- as.matrix(read.table('data/ASV_table.tsv', sep = "\t", header = T, row.names = 1))
@@ -108,11 +108,11 @@ ps.16S.S <- subset_samples(ps.16S, Compartment == "Soil")
 ps.16S.H <- subset_samples(ps.16S, Compartment == "Herbivore")
 ```
 
-### Phylogenetic diversity
+## Phylogenetic diversity
 
-Code for: Tab. S1, Figs. S1-S2-S3, and Fig. 2A.
+Code for: Fig. 2A, Tab. S1, and Figs. S1-S3.
 
-Calculate Phylogenetic Diversity.
+### Calculate Phylogenetic Diversity.
 
 ```r
 calc.div <- function(ps){
@@ -128,7 +128,7 @@ calc.div <- function(ps){
 div.df <- calc.div(ps.16S)
 ```
 
-Model, run post-hoc contrasts, and estimate variance explained for **rhizosphere** samples.
+### Model, run post-hoc contrasts, and estimate variance explained for **rhizosphere** samples
 
 ```r
 model.div <- function(x){
@@ -153,7 +153,7 @@ pairs(m1)
 model.div(div.df.S)
 ```
 
-Figure S1.
+### Figure S1
 
 ```r
 plot1 <- ggplot(div.df.S, aes(x = Herbivore, y = PD, fill = Herbivore)) +
@@ -193,7 +193,7 @@ px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.l
 ```
 <img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/c0aac4f3-b6df-4ab7-a307-99942965bef3">
 
-Model, run post-hoc contrasts, and estimate variance explained for **root** samples.
+### Model, run post-hoc contrasts, and estimate variance explained for **root** samples
 
 ```r
 div.df.R <- div.df[which(div.df$Compartment == "Roots"),]
@@ -206,7 +206,7 @@ pairs(m1)
 model.div(div.df.R)
 ```
 
-Figure S2.
+### Figure S2
 
 ```r
 plot1 <- ggplot(div.df.R, aes(x = Herbivore, y = PD, fill = Herbivore)) +
@@ -246,7 +246,7 @@ px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.l
 ```
 <img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/0f91a5a9-48ed-44be-b0c8-ce2f8f3acd89">
 
-Model, run post-hoc contrasts, and estimate variance explained for **leaf** samples.
+### Model, run post-hoc contrasts, and estimate variance explained for **leaf** samples
 
 ```r
 div.df.L <- div.df[which(div.df$Compartment == "Leaves"),]
@@ -259,7 +259,7 @@ pairs(m1)
 model.div(div.df.L)
 ```
 
-Figure S3.
+### Figure S3
 
 ```r
 plot1 <- ggplot(div.df.L, aes(x = Herbivore, y = PD, fill = Herbivore)) +
@@ -299,7 +299,7 @@ px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.l
 ```
 <img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/a2c78f0a-ee15-43ad-adbf-8c5baf2be906">
 
-Model, run post-hoc contrasts, and estimate variance explained for **herbivore** samples.
+### Model, run post-hoc contrasts, and estimate variance explained for **herbivore** samples
 
 ```r
 model.div.H <- function(x){
@@ -321,7 +321,7 @@ m1 <- emmeans(model, "Soil")
 pairs(m1)
 ```
 
-Fig. 2A
+### Figure 2A
 
 ```r
 plot1 <- ggplot(div.df.H, aes(x = Soil, y = PD, fill = Soil)) +
@@ -342,53 +342,220 @@ plot1 <- ggplot(div.df.H, aes(x = Soil, y = PD, fill = Soil)) +
 ```
 <img width="421" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/b9c643a8-afb1-448b-9bf5-dc9cfdec9296">
 
+## Multivariate analyses
 
+Code for: Tab 1, Fig. 2B, Tabs. S2-S3, Figs. S4-S6.
 
-```r
-
-```
-
-
+### PERMANOVA and posthoc contrasts for rhizosphere samples
 
 ```r
+permanova.compartment <- function(psobject, compartment){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  sampledf <- data.frame(sample_data(ps))
+  dist.mat <- phyloseq::distance(ps, method = "unifrac")
+  perm <- how(nperm = 999)
+  set.seed(100)
+  pmv <- adonis2(dist.mat ~ Soil * Herbivore * Treatment, data = sampledf, permutations = perm)
+  return(pmv)
+}
 
+posthoc.soilXherbivoryXTreatment <- function(psobject, compartment){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  sampledf <- data.frame(sample_data(ps))
+  dist.mat <- phyloseq::distance(ps, method = "unifrac")
+  pairwise.perm.manova(dist.mat, paste0(sampledf$Soil, sampledf$Herbivore, sampledf$Treatment), nperm = 999, progress = TRUE, p.method = "fdr", F = T, R2 = T)
+}
+
+permanova.compartment(ps.16S, "Soil")
+posthoc.soilXherbivoryXTreatment(ps.16S, "Soil")
 ```
 
-
+### PERMANOVA and posthoc contrasts for root samples
 
 ```r
-
+permanova.compartment(ps.16S, "Roots")
+posthoc.soilXherbivoryXTreatment(ps.16S, "Roots")
 ```
 
-
+### PERMANOVA and posthoc contrasts for leaf samples
 
 ```r
-
+permanova.compartment(ps.16S, "Leaves")
+posthoc.soilXherbivoryXTreatment(ps.16S, "Leaves")
 ```
 
-
+### PERMANOVA for herbivore samples
 
 ```r
+permanova.compartment.H <- function(psobject, compartment){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  sampledf <- data.frame(sample_data(ps))
+  dist.mat <- phyloseq::distance(ps, method = "unifrac")
+  perm <- how(nperm = 999)
+  set.seed(100)
+  pmv <- adonis2(dist.mat ~ Soil * Treatment, data = sampledf, permutations = perm)
+  return(pmv)
+}
 
+permanova.compartment.H(ps.16S, "Herbivore")
 ```
 
+### NMDS according to soil inoculum
 
+Figure S4.
 
 ```r
+nmds.soil <- function(psobject, compartment, label){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  cap_ord <- ordinate(physeq = ps, method = "NMDS", distance = "unifrac", formula = ~ 1)
+  cap_plot <- plot_ordination(physeq = ps, ordination = cap_ord, axes = c(1,2)) +
+    stat_ellipse(mapping = aes(fill = Soil),
+                 alpha = 0.4,
+                 geom = "polygon",
+                 show.legend=T) +
+    theme_bw(base_size = 15) +
+    geom_point(mapping = aes(color = Soil), size = 2.5) +
+    scale_colour_manual(values=c("#d73027", "#fee08b", "#1a9850"),
+                        breaks = c("Agricultural", "Margin", "Prairie"),
+                        labels=c("Agricultural", "Margin", "Prairie"),
+                        guide = "none") +
+    scale_fill_manual(name = "Legend",
+                      values=c("#d73027", "#fee08b", "#1a9850"),
+                      breaks = c("Agricultural", "Margin", "Prairie"),
+                      labels=c("Agricultural", "Margin", "Prairie"),
+                      guide = guide_legend(override.aes = list(alpha = 1))) +
+    theme(legend.title=element_blank(),
+          legend.text = element_text(size = 12, family="Helvetica"),
+          axis.text.x = element_text(color="black"),
+          axis.text.y = element_text(color="black"),
+          panel.grid = element_blank()) +
+    ggtitle(paste0(label))
+  return(cap_plot)}
 
+a <- nmds.soil(ps.16S, "Soil", "Rhizosphere soil")
+b <- nmds.soil(ps.16S, "Roots", "Roots")
+c <- nmds.soil(ps.16S, "Leaves", "Leaves")
+
+px <- ggpubr::ggarrange(a, b, c, ncol = 3, nrow = 1, align = "hv", common.legend = T)
 ```
+<img width="1290" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/d01712e5-3156-41db-9425-f460aff92aca">
 
-
+Figure 2B.
 
 ```r
+nmds.soil <- function(psobject, compartment){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  cap_ord <- ordinate(physeq = ps, method = "NMDS", distance = "unifrac", formula = ~ 1)
+  cap_plot <- plot_ordination(physeq = ps, ordination = cap_ord, axes = c(1,2)) +
+    stat_ellipse(mapping = aes(fill = Soil),
+                 alpha = 0.4,
+                 geom = "polygon",
+                 show.legend=T) +
+    theme_bw(base_size = 15) +
+    geom_point(mapping = aes(color = Soil), size = 2.5) +
+    scale_colour_manual(values=c("#d73027", "#fee08b", "#1a9850"),
+                        breaks = c("Agricultural", "Margin", "Prairie"),
+                        labels=c("Agricultural", "Margin", "Prairie"),
+                        guide = "none") +
+    scale_fill_manual(name = "Legend",
+                      values=c("#d73027", "#fee08b", "#1a9850"),
+                      breaks = c("Agricultural", "Margin", "Prairie"),
+                      labels=c("Agricultural", "Margin", "Prairie"),
+                      guide = guide_legend(override.aes = list(alpha = 1))) +
+    theme(legend.title=element_blank(),
+          legend.position="none",
+          legend.text = element_text(size = 12, family="Helvetica"),
+          axis.text.x = element_text(color="black"),
+          axis.text.y = element_text(color="black"),
+          panel.grid = element_blank())
+  return(cap_plot)}
 
+d <- nmds.soil(ps.16S, "Herbivore")
 ```
+<img width="424" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/ab75cc01-00f0-4b74-ac0a-a93b58619012">
 
-
+### NMDS according to herbivory
 
 ```r
+nmds.herb <- function(psobject, compartment, label){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  cap_ord <- ordinate(physeq = ps, method = "NMDS", distance = "unifrac", formula = ~ 1)
+  cap_plot <- plot_ordination(physeq = ps, ordination = cap_ord, axes = c(1,2)) +
+    stat_ellipse(mapping = aes(fill = Herbivore),
+                 alpha = 0.4,
+                 geom = "polygon",
+                 show.legend=T) +
+    theme_bw(base_size = 15) +
+    geom_point(mapping = aes(color = Herbivore), size = 2.5) +
+    scale_colour_manual(values=c("#ff7f00", "#377eb8"),
+                        breaks = c("Present", "Absent"),
+                        labels=c("Present", "Absent"),
+                        guide = "none") +
+    scale_fill_manual(name = "Legend",
+                      values=c("#ff7f00", "#377eb8"),
+                      breaks = c("Present", "Absent"),
+                      labels=c("Present", "Absent"),
+                      guide = guide_legend(override.aes = list(alpha = 1))) +
+    theme(legend.title=element_blank(),
+          legend.text = element_text(size = 12, family="Helvetica"),
+          axis.text.x = element_text(color="black"),
+          axis.text.y = element_text(color="black"),
+          panel.grid = element_blank()) +
+    ggtitle(paste0(label))
+  return(cap_plot)}
 
+a <- nmds.herb(ps.16S, "Soil", "Rhizosphere soil")
+b <- nmds.herb(ps.16S, "Roots", "Roots")
+c <- nmds.herb(ps.16S, "Leaves", "Leaves")
+
+px <- ggpubr::ggarrange(a, b, c, ncol = 3, nrow = 1, align = "hv", common.legend = T)
 ```
+<img width="1290" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/833ccbfb-8eeb-403e-982a-6c39a66005b8">
+
+### NMDS according to treatment
+
+```r
+nmds.treatment <- function(psobject, compartment, label){
+  ks <- sample_data(psobject)[["Compartment"]] %in% paste0(compartment)
+  ps <- prune_samples(samples = ks, psobject)
+  cap_ord <- ordinate(physeq = ps, method = "NMDS", distance = "unifrac", formula = ~ 1)
+  cap_plot <- plot_ordination(physeq = ps, ordination = cap_ord, axes = c(1,2)) +
+    stat_ellipse(mapping = aes(fill = Treatment),
+                 alpha = 0.4,
+                 geom = "polygon",
+                 show.legend=T) +
+    theme_bw(base_size = 15) +
+    geom_point(mapping = aes(color = Treatment), size = 2.5) +
+    scale_colour_manual(values=c("#b3b3b3", "#8da0cb"),
+                        breaks = c("Covered", "Uncovered"),
+                        labels=c("Covered", "Uncovered"),
+                        guide = "none") +
+    scale_fill_manual(name = "Legend",
+                      values=c("#b3b3b3", "#8da0cb"),
+                      breaks = c("Covered", "Uncovered"),
+                      labels=c("Covered", "Uncovered"),
+                      guide = guide_legend(override.aes = list(alpha = 1))) +
+    theme(legend.title=element_blank(),
+          legend.text = element_text(size = 12, family="Helvetica"),
+          axis.text.x = element_text(color="black"),
+          axis.text.y = element_text(color="black"),
+          panel.grid = element_blank()) +
+    ggtitle(paste0(label))
+  return(cap_plot)}
+
+a <- nmds.treatment(ps.16S, "Soil", "Rhizosphere soil")
+b <- nmds.treatment(ps.16S, "Roots", "Roots")
+c <- nmds.treatment(ps.16S, "Leaves", "Leaves")
+
+px <- ggpubr::ggarrange(a, b, c, ncol = 3, nrow = 1, align = "hv", common.legend = T)
+```
+<img width="1290" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/c4d87281-3927-4c94-9c88-5c160bb5ff8c">
 
 
 
