@@ -841,6 +841,260 @@ compare.upset.df <- function(df1, df2){
 compare.upset.df(upset.df.covered, upset.df.uncovered)
 ```
 
+## Differentially abundant taxa
+
+Code for: Fig. 4, Fig. 5, Tab. S6, and Fig. S11.
+
+```r
+cal.diff.taxa.cover <- function(object){
+  diagdds <- phyloseq_to_deseq2(object, ~ 1)
+  ts <- counts(diagdds)
+  geoMeans = apply(ts, 1, function(row) if (all(row == 0)) 0 else exp(mean(log(row[row != 0]))))
+  diagdds = estimateSizeFactors(diagdds, geoMeans=geoMeans)
+  diagdds = estimateDispersions(diagdds)
+  diagdds$group <- factor(paste0(diagdds$Treatment))
+  design(diagdds) <- ~ group
+  dds <-DESeq(diagdds, betaPrior=FALSE, parallel = T)
+  c1 <- results(dds, contrast=c("group", "Covered", "Uncovered"), parallel = T)
+  c1 <- as.data.frame(c1)
+  c1 <- setDT(c1, keep.rownames = TRUE)[]
+  c1 <- c1[,c("rn", "log2FoldChange", "padj")]
+  tax.table <- as.data.frame(tax_table(object))
+  tax.table <- setDT(tax.table, keep.rownames = TRUE)[]
+  tx <- merge(c1, tax.table, by = "rn")
+  return(tx)
+}
+
+cal.diff.taxa.herb <- function(object){
+  diagdds <- phyloseq_to_deseq2(object, ~ 1)
+  ts <- counts(diagdds)
+  geoMeans = apply(ts, 1, function(row) if (all(row == 0)) 0 else exp(mean(log(row[row != 0]))))
+  diagdds = estimateSizeFactors(diagdds, geoMeans=geoMeans)
+  diagdds = estimateDispersions(diagdds)
+  diagdds$group <- factor(paste0(diagdds$Herbivore))
+  design(diagdds) <- ~ group
+  dds <-DESeq(diagdds, betaPrior=FALSE, parallel = T)
+  c1 <- results(dds, contrast=c("group", "Present", "Absent"), parallel = T)
+  c1 <- as.data.frame(c1)
+  c1 <- setDT(c1, keep.rownames = TRUE)[]
+  c1 <- c1[,c("rn", "log2FoldChange", "padj")]
+  tax.table <- as.data.frame(tax_table(object))
+  tax.table <- setDT(tax.table, keep.rownames = TRUE)[]
+  tx <- merge(c1, tax.table, by = "rn")
+  return(tx)
+}
+
+plot.diff.taxa <- function(ps, title, contrast, labels){
+  df.diff <- if(contrast == "cover"){cal.diff.taxa.cover(ps)} else if(contrast == "herbivory"){cal.diff.taxa.herb(ps)}
+  df.diff$diffexpressed <- "no changes"
+  df.diff$diffexpressed[df.diff$log2FoldChange > 0.1 & df.diff$padj < 0.05] <- if(contrast == "cover"){"Covered"} else if(contrast == "herbivory"){"Present"}
+  df.diff$diffexpressed[df.diff$log2FoldChange < -0.1 & df.diff$padj < 0.05] <- if(contrast == "cover"){"Uncovered"} else if(contrast == "herbivory"){"Absent"}
+  df.diff$Genus <- ifelse(df.diff$Genus == "Allorhizobium-Neorhizobium-Pararhizobium-Rhizobium", "Rhizobia(*)", df.diff$Genus)
+  df.diff$Genus[df.diff$Genus==""]<-NA
+  df.diff$Genus <- ifelse(is.na(df.diff$Genus) == T, df.diff$Family, df.diff$Genus)
+  plot <- ggplot(data=df.diff) +
+        theme_bw(base_size = 12) +
+        geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed)) +
+        geom_text_repel(aes(x = log2FoldChange, y = -log10(padj), label = if(labels == T){ifelse(diffexpressed != "no changes", Genus,"")} else if(labels == F){""}), position = "dodge", size = 3, max.overlaps = Inf, force = 10, box.padding = 0.2, min.segment.length = 0, seed = 42) +
+        scale_color_manual(values=c("blue", "red", "black")) +
+        geom_vline(xintercept=0, col="black", linetype = "longdash") +
+        geom_hline(yintercept=-log10(0.05), col="black", linetype = "longdash") +
+        theme(panel.grid = element_blank(),
+              panel.background = element_rect(fill = if(contrast == "cover"){"#f7fbff"} else if(contrast == "herbivory"){"#ffffcc"}, 
+                                              colour = if(contrast == "cover"){"#f7fbff"} else if(contrast == "herbivory"){"#ffffcc"}, 
+                                              size = 0.5, linetype = "solid"),
+              legend.position="none",
+              panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+        ggtitle(paste0(title, if(contrast == "cover"){" - covered vs uncovered"} else if(contrast == "herbivory"){" - herbivory vs control"})) +
+        xlab(expression(paste(Log[2], " Fold Changes"))) +
+        ylab(expression(paste(-Log[10], " P"))) +
+        scale_color_manual(name = "Legend", values=c("#4daf4a", "#e41a1c", "#000000"), labels = if(contrast == "cover"){c("Treatment", "Covered", "Uncovered")} else if(contrast == "herbivory"){c("Herbivore", "Present", "Absent")},
+                           breaks = if(contrast == "cover"){c("Treatment", "Covered", "Uncovered")} else if(contrast == "herbivory"){c("Herbivore", "Present", "Absent")})
+  return(plot)
+}
+
+plot1 <- plot.diff.taxa(ps.16S.S, "Rhizosphere",  "cover", T)
+plot2 <- plot.diff.taxa(ps.16S.R, "Roots", "cover", F)
+plot3 <- plot.diff.taxa(ps.16S.L, "Leaves", "cover", T)
+plot4 <- plot.diff.taxa(ps.16S.H, "Herbivore", "cover", T)
+plot5 <- plot.diff.taxa(ps.16S.S, "Rhizosphere", "herbivory", T)
+plot6 <- plot.diff.taxa(ps.16S.R, "Roots",  "herbivory", T)
+plot7 <- plot.diff.taxa(ps.16S.L, "Leaves", "herbivory", T)
+
+
+px <- ggpubr::ggarrange(plot1, plot5, plot2, plot6, plot3, plot7, plot4, ncol = 2, nrow = 4, align = "hv", common.legend = T)
+```
+<img width="826" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/1c17dd0e-c009-4893-b683-fc261788991b">
+
+
+```r
+cal.diff.taxa.soil <- function(object, g1, g2){
+  diagdds <- phyloseq_to_deseq2(object, ~ 1)
+  ts <- counts(diagdds)
+  geoMeans = apply(ts, 1, function(row) if (all(row == 0)) 0 else exp(mean(log(row[row != 0]))))
+  diagdds = estimateSizeFactors(diagdds, geoMeans=geoMeans)
+  diagdds = estimateDispersions(diagdds)
+  diagdds$group <- factor(paste0(diagdds$Soil))
+  design(diagdds) <- ~ group
+  dds <-DESeq(diagdds, betaPrior=FALSE, parallel = T)
+  c1 <- results(dds, contrast=c("group", g1, g2), parallel = T)
+  c1 <- as.data.frame(c1)
+  c1 <- setDT(c1, keep.rownames = TRUE)[]
+  c1 <- c1[,c("rn", "log2FoldChange", "padj")]
+  tax.table <- as.data.frame(tax_table(object))
+  tax.table <- setDT(tax.table, keep.rownames = TRUE)[]
+  tx <- merge(c1, tax.table, by = "rn")
+  return(tx)
+}
+
+
+plot.diff.taxa.soil <- function(ps, title, g1, g2, labels){
+  df.diff <- cal.diff.taxa.soil(ps, g1, g2)
+  df.diff$diffexpressed <- "no changes"
+  df.diff$diffexpressed[df.diff$log2FoldChange > 0.1 & df.diff$padj < 0.05] <- paste0(g1)
+  df.diff$diffexpressed[df.diff$log2FoldChange < -0.1 & df.diff$padj < 0.05] <- paste0(g2)
+  df.diff$Genus <- ifelse(df.diff$Genus == "Allorhizobium-Neorhizobium-Pararhizobium-Rhizobium", "Rhizobia(*)", df.diff$Genus)
+  df.diff$Genus[df.diff$Genus==""]<-NA
+  df.diff$Genus <- ifelse(is.na(df.diff$Genus) == T, df.diff$Family, df.diff$Genus)
+  plot <- ggplot(data=df.diff) +
+        theme_bw(base_size = 12) +
+        geom_point(aes(x = log2FoldChange, y = -log10(padj), colour = diffexpressed)) +
+        geom_text_repel(aes(x = log2FoldChange, y = -log10(padj), label = if(labels == T){ifelse(diffexpressed != "no changes", Genus,"")} else if(labels == F){""}), position = "dodge", size = 3, max.overlaps = Inf, force = 10, box.padding = 0.2, min.segment.length = 0, seed = 42) +
+        scale_color_manual(values=c("blue", "red", "black")) +
+        geom_vline(xintercept=0, col="black", linetype = "longdash") +
+        geom_hline(yintercept=-log10(0.05), col="black", linetype = "longdash") +
+        theme(panel.grid = element_blank(),
+              panel.background = element_rect(fill = "white", 
+                                              colour = "white", 
+                                              size = 0.5, linetype = "solid"),
+              legend.position="none",
+              panel.border = element_rect(colour = "black", fill=NA, size=1)) +
+        ggtitle(paste0(title, " - ", g1, " vs ", g2)) +
+        xlab(expression(paste(Log[2], " Fold Changes"))) +
+        ylab(expression(paste(-Log[10], " P"))) +
+        scale_color_manual(name = "Legend", values=c("#4daf4a", "#e41a1c", "#000000"), labels = c("Soil", g1, g2), breaks =c("Soil", g1, g2))
+  return(plot)
+}
+
+plot1 <- plot.diff.taxa.soil(ps.16S.S, "Rhizosphere", "Agricultural", "Margin", T)
+plot2 <- plot.diff.taxa.soil(ps.16S.S, "Rhizosphere", "Agricultural", "Prairie", T)
+plot3 <- plot.diff.taxa.soil(ps.16S.S, "Rhizosphere", "Margin", "Prairie", T)
+
+plot4 <- plot.diff.taxa.soil(ps.16S.R, "Roots", "Agricultural", "Margin", F)
+plot5 <- plot.diff.taxa.soil(ps.16S.R, "Roots", "Agricultural", "Prairie", F)
+plot6 <- plot.diff.taxa.soil(ps.16S.R, "Roots", "Margin", "Prairie", F)
+
+plot7 <- plot.diff.taxa.soil(ps.16S.L, "Leaves", "Agricultural", "Margin", T)
+plot8 <- plot.diff.taxa.soil(ps.16S.L, "Leaves", "Agricultural", "Prairie", T)
+plot9 <- plot.diff.taxa.soil(ps.16S.L, "Leaves", "Margin", "Prairie", T)
+
+plot10 <- plot.diff.taxa.soil(ps.16S.H, "Herbivore", "Agricultural", "Margin", T)
+plot11 <- plot.diff.taxa.soil(ps.16S.H, "Herbivore", "Agricultural", "Prairie", T)
+plot12 <- plot.diff.taxa.soil(ps.16S.H, "Herbivore", "Margin", "Prairie", T)
+
+px <- ggpubr::ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9, plot10, plot11, plot12, ncol = 3, nrow = 4, align = "hv", common.legend = F)
+```
+<img width="1133" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/1a2e1bcb-77d9-4d19-9921-2ce73ff9d053">
+
+
+```r
+table.diff.taxa <- function(ps, g1, g2){
+  df.diff <- cal.diff.taxa.soil(ps, g1, g2)
+  df.diff <- df.diff[which(df.diff$padj < 0.05),]
+  df.diff$diffexpressed[df.diff$log2FoldChange > 0.1 & df.diff$padj < 0.05] <- paste0(g1)
+  df.diff$diffexpressed[df.diff$log2FoldChange < -0.1 & df.diff$padj < 0.05] <- paste0(g2)
+  return(df.diff)
+}
+
+table.diff.taxa(ps.16S.R, "Agricultural", "Margin") %>% write.table("diffasv_AM.txt", sep = "\t")
+table.diff.taxa(ps.16S.R, "Agricultural", "Prairie") %>% write.table("diffasv_AP.txt", sep = "\t")
+table.diff.taxa(ps.16S.R, "Margin", "Prairie") %>% write.table("diffasv_MP.txt", sep = "\t")
+```
+
+
+```r
+library("ggvenn")
+a <- table.diff.taxa(ps.16S.R, "Agricultural", "Margin")$rn
+b <- table.diff.taxa(ps.16S.R, "Agricultural", "Prairie")$rn
+c <- table.diff.taxa(ps.16S.R, "Margin", "Prairie")$rn
+
+list.venn <- list(AvsM = a,
+          AvsP = b,
+          MvsP = c)
+
+ggvenn(list.venn) 
+```
+<img width="420" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/7c5fe4d7-3f74-4763-b21f-9a0540ca02b4">
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
+
+
+```r
+
+```
 
 
 ```r
