@@ -738,15 +738,107 @@ b_plot <- ggplot(mntd.df.H, aes(x = Soil, y = mntd.obs, fill = Soil)) +
 ```
 <img width="476" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/8a609d6f-bbcb-4835-af1f-f6fb0c3dae09">
 
+## Upset plot
+
+Code for: Fig. 3 and Tab. S5.
 
 ```r
+library('ComplexUpset')
+library('metagMisc')
 
+upsetvec <- function(ps){
+  ps <- filter_taxa(ps, function (x) {sum(x > 0) > 1}, prune=TRUE)
+  glom <- microbiome::transform(ps, "compositional")
+  dat <- psmelt(glom)
+  dat2 <- dat %>% group_by(OTU) %>% dplyr::summarize(cs = mean(Abundance)) %>% mutate(cs = cs/sum(cs)) %>% filter(cs > 0)
+  return(dat2$OTU)
+}
+
+genupset.df <- function(x){
+  ps.16S <- filter_taxa(x, function (x) {sum(x > 0) > 1}, prune=TRUE)
+  
+  ks <- sample_data(ps.16S)[["Compartment"]] %in% "Leaves"
+  ps.16S.L <- prune_samples(samples = ks, ps.16S)
+  ks <- sample_data(ps.16S)[["Compartment"]] %in% "Roots"
+  ps.16S.R <- prune_samples(samples = ks, ps.16S)
+  ks <- sample_data(ps.16S)[["Compartment"]] %in% "Soil"
+  ps.16S.S <- prune_samples(samples = ks, ps.16S)
+  ks <- sample_data(ps.16S)[["Compartment"]] %in% "Herbivore"
+  ps.16S.H <- prune_samples(samples = ks, ps.16S)
+  
+  upset.H <- upsetvec(ps.16S.H)
+  upset.L <- upsetvec(ps.16S.L)
+  upset.R <- upsetvec(ps.16S.R)
+  upset.S <- upsetvec(ps.16S.S)
+  
+  rn <- Reduce(union, list(upset.H, upset.L, upset.R, upset.S))
+  dat <- data.frame(herbivore = as.integer(rn %in% upset.H),
+                    leaves = as.integer(rn %in% upset.L),
+                    roots = as.integer(rn %in% upset.R),
+                    rhizosphere = as.integer(rn %in% upset.S))
+  row.names(dat) <- rn
+  compartments <- colnames(dat)
+  return(dat)
+}
+
+
+compartments <- factor(levels = c("herbivore", "leaves", "roots", "rhizosphere"))
+ps.covered <- subset_samples(ps.16S, Treatment == "Covered") 
+upset.df.covered <- genupset.df(ps.covered)
+upset.covered <- upset(upset.df.covered, compartments, name=' ', width_ratio=0.1, sort_intersections=FALSE, sort_sets=FALSE,
+    intersections=list("herbivore", "leaves", "roots", "rhizosphere",
+                       c("herbivore", "leaves"), c("herbivore", "roots"), c("herbivore", "rhizosphere"), c("leaves", "roots"), c("leaves", "rhizosphere"), c("roots", "rhizosphere"),
+                       c("herbivore", "leaves", "roots"), c("herbivore", "leaves", "rhizosphere"), c("leaves", "roots", "rhizosphere"), c("herbivore", "roots", "rhizosphere"),
+                       c("herbivore", "leaves", "roots", "rhizosphere")
+                       ),
+    base_annotations = list('Intersection size'=(intersection_size()+
+                                                   ylim(c(0, 4000))+ 
+                                                   theme(panel.grid = element_blank(),
+                                                         axis.ticks = element_line(color="black"),
+                                                         axis.line = element_line(colour = "black"))+
+                                                   ylab('# of ASVs - covered'))),
+    set_sizes=F)
+
+
+ps.uncovered <- subset_samples(ps.16S, Treatment == "Uncovered") 
+upset.df.uncovered <- genupset.df(ps.uncovered)
+upset.uncovered <- upset(upset.df.uncovered, compartments, name=' ', width_ratio=0.1, sort_intersections=FALSE, sort_sets=FALSE,
+    intersections=list("herbivore", "leaves", "roots", "rhizosphere",
+                       c("herbivore", "leaves"), c("herbivore", "roots"), c("herbivore", "rhizosphere"), c("leaves", "roots"), c("leaves", "rhizosphere"), c("roots", "rhizosphere"),
+                       c("herbivore", "leaves", "roots"), c("herbivore", "leaves", "rhizosphere"), c("leaves", "roots", "rhizosphere"), c("herbivore", "roots", "rhizosphere"),
+                       c("herbivore", "leaves", "roots", "rhizosphere")
+                       ),
+    base_annotations = list('Intersection size'=(intersection_size()+
+                                                   ylim(c(0, 4000))+ 
+                                                   theme(panel.grid = element_blank(),
+                                                         axis.ticks = element_line(color="black"),
+                                                         axis.line = element_line(colour = "black"))+
+                                                   ylab('# of ASVs - uncovered'))),
+    set_sizes=F)
+
+px <- ggpubr::ggarrange(upset.covered, upset.uncovered, ncol = 1, nrow = 2, align = "hv", common.legend = T)
 ```
-
+<img width="964" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/1239b98f-1b6e-46a8-91c1-9ae21365eae6">
 
 
 ```r
+compare.upset.df <- function(df1, df2){
+  intersections_data.1 = upset_data(df1,  c("herbivore", "leaves", "roots", "rhizosphere"))
+  intersection_sizes.1 = unique(intersections_data.1$with_sizes[, c('intersection', 'exclusive_intersection_size')])
+  intersections_data.2 = upset_data(df2,  c("herbivore", "leaves", "roots", "rhizosphere"))
+  intersection_sizes.2 = unique(intersections_data.2$with_sizes[, c('intersection', 'exclusive_intersection_size')])
+  compare <- merge(intersection_sizes.1, intersection_sizes.2, by = "intersection")
+  colnames(compare) <- c("intersection", "g1", "g2")
+  df <- compare %>%
+    dplyr::rowwise() %>%
+    dplyr::mutate(
+      chi_sq = chisq.test(c(g1, g2))$statistic,
+      p_val = chisq.test(c(g1, g2))$p.value,
+      sig = ifelse(p_val<0.05, "*", " "))
+  return(df)
+}
 
+compare.upset.df(upset.df.covered, upset.df.uncovered)
 ```
 
 
