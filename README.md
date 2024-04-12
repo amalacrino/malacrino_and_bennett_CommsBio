@@ -103,19 +103,6 @@ ps.16S <- subset_taxa(ps.16S, Class !="Chloroplast")
 ps.16S <- subset_taxa(ps.16S, Order !="Chloroplast")
 ps.16S <- subset_taxa(ps.16S, Family !="Mitochondria")
 
-remove.cont <- function(ps){
-  sample_data(ps)$is.neg <- sample_data(ps)$Treatment == "DNA_extraction"
-  contamdf.prev <- isContaminant(ps, method="prevalence", neg="is.neg", threshold = 0.05)
-  cont.remove <- subset(contamdf.prev, contaminant == "TRUE")
-  cont.remove <- row.names(cont.remove)
-  allTaxa = taxa_names(ps)
-  allTaxa <- allTaxa[!(allTaxa %in% cont.remove)]
-  ps <-  prune_taxa(allTaxa, ps)
-  temp <- sample_data(ps)[["Treatment"]] %ni% "DNA_extraction"
-  ps <- prune_samples(samples = temp, ps)
-  return(ps)
-}
-
 ps.16S <- subset_samples(ps.16S, Compartment != "Control") 
 ps.16S <- subset_samples(ps.16S, Soil != "No_treatment") 
 ps.16S <- filter_taxa(ps.16S, function (x) {sum(x > 0) > 1}, prune=TRUE)
