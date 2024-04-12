@@ -108,3 +108,338 @@ ps.16S.S <- subset_samples(ps.16S, Compartment == "Soil")
 ps.16S.H <- subset_samples(ps.16S, Compartment == "Herbivore")
 ```
 
+### Phylogenetic diversity
+
+Code for: Tab. S1, Figs. S1-S2-S3, and Fig. 2A.
+
+Calculate Phylogenetic Diversity.
+
+```r
+calc.div <- function(ps){
+  div <- microbiome::alpha(ps, index = "diversity_shannon")
+  otus <- as.data.frame(t(otu_table(ps)))
+  tree <- phy_tree(ps)
+  div.pd <- pd(otus, tree, include.root = FALSE)
+  div.2 <- cbind(sample_data(ps), div)
+  div.2 <- cbind(div.2, div.pd)
+  return(div.2)
+}
+
+div.df <- calc.div(ps.16S)
+```
+
+Model, run post-hoc contrasts, and estimate variance explained for **rhizosphere** samples.
+
+```r
+model.div <- function(x){
+  model.qv <- lmer(PD ~ Soil * Herbivore * Treatment * (1|Block), data = x)
+  anova.qv <- Anova(model.qv)
+  anova.qv <- data.table::setDT(anova.qv, keep.rownames = TRUE)[]
+  r2lmer <- data.frame(Factor = c("Soil", "Herbivore", "Treatment"),
+                       R2 = c(r.squaredGLMM(lmer(PD ~ Soil + (1|Block), data = x))[1],
+                             r.squaredGLMM(lmer(PD ~ Herbivore + (1|Block), data = x))[1],
+                             r.squaredGLMM(lmer(PD ~ Treatment + (1|Block), data = x))[1]))
+  model.sum <- merge(anova.qv, r2lmer, by.x = "rn", by.y = "Factor")
+  return(model.sum)
+}
+
+div.df.S <- div.df[which(div.df$Compartment == "Soil"),]
+model <- lmer(PD ~ Soil * Herbivore * Treatment * (1|Block), data = div.df.S)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
+m1 <- emmeans(model, "Treatment", by = c("Soil", "Herbivore"))
+pairs(m1)
+model.div(div.df.S)
+```
+
+Figure S1.
+
+```r
+plot1 <- ggplot(div.df.S, aes(x = Herbivore, y = PD, fill = Herbivore)) +
+                      facet_grid(Soil ~ Treatment) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
+
+plot2 <- ggplot(div.df.S, aes(x = Treatment, y = PD, fill = Treatment)) +
+                      facet_grid(Soil ~ Herbivore) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#b3b3b3", "#8da0cb"),
+                                      breaks = c("Covered", "Uncovered"),
+                                      labels=c("Covered", "Uncovered"))
+
+px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.legend = F)
+```
+<img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/c0aac4f3-b6df-4ab7-a307-99942965bef3">
+
+Model, run post-hoc contrasts, and estimate variance explained for **root** samples.
+
+```r
+div.df.R <- div.df[which(div.df$Compartment == "Roots"),]
+model <- lmer(PD ~ Soil * Herbivore * Treatment * (1|Block), data = div.df.R)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
+m1 <- emmeans(model, "Treatment", by = c("Soil", "Herbivore"))
+pairs(m1)
+model.div(div.df.R)
+```
+
+Figure S2.
+
+```r
+plot1 <- ggplot(div.df.R, aes(x = Herbivore, y = PD, fill = Herbivore)) +
+                      facet_grid(Soil ~ Treatment) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
+
+plot2 <- ggplot(div.df.R, aes(x = Treatment, y = PD, fill = Treatment)) +
+                      facet_grid(Soil ~ Herbivore) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#b3b3b3", "#8da0cb"),
+                                      breaks = c("Covered", "Uncovered"),
+                                      labels=c("Covered", "Uncovered"),)
+
+px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.legend = F)
+```
+<img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/0f91a5a9-48ed-44be-b0c8-ce2f8f3acd89">
+
+Model, run post-hoc contrasts, and estimate variance explained for **leaf** samples.
+
+```r
+div.df.L <- div.df[which(div.df$Compartment == "Leaves"),]
+model <- lmer(PD ~ Soil * Herbivore * Treatment * (1|Block), data = div.df.L)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
+m1 <- emmeans(model, "Treatment", by = c("Soil", "Herbivore"))
+pairs(m1)
+model.div(div.df.L)
+```
+
+Figure S3.
+
+```r
+plot1 <- ggplot(div.df.L, aes(x = Herbivore, y = PD, fill = Herbivore)) +
+                      facet_grid(Soil ~ Treatment) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
+
+plot2 <- ggplot(div.df.L, aes(x = Treatment, y = PD, fill = Treatment)) +
+                      facet_grid(Soil ~ Herbivore) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#b3b3b3", "#8da0cb"),
+                                      breaks = c("Covered", "Uncovered"),
+                                      labels=c("Covered", "Uncovered"),)
+
+px <- ggpubr::ggarrange(plot1, plot2, ncol = 2, nrow = 1, align = "hv", common.legend = F)
+```
+<img width="1079" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/a2c78f0a-ee15-43ad-adbf-8c5baf2be906">
+
+Model, run post-hoc contrasts, and estimate variance explained for **herbivore** samples.
+
+```r
+model.div.H <- function(x){
+  model.qv <- lmer(PD ~ Soil * Treatment * (1|Block), data = x)
+  anova.qv <- Anova(model.qv)
+  anova.qv <- data.table::setDT(anova.qv, keep.rownames = TRUE)[]
+  r2lmer <- data.frame(Factor = c("Soil", "Treatment"),
+                       R2 = c(r.squaredGLMM(lmer(PD ~ Soil + (1|Block), data = x))[1],
+                             r.squaredGLMM(lmer(PD ~ Treatment + (1|Block), data = x))[1]))
+  model.sum <- merge(anova.qv, r2lmer, by.x = "rn", by.y = "Factor")
+  return(model.sum)
+}
+
+div.df.H <- div.df[which(div.df$Compartment == "Herbivore"),]
+model <- lmer(PD ~ Soil * Treatment * (1|Block), data = div.df.H)
+Anova(model)
+model.div.H(div.df.H)
+m1 <- emmeans(model, "Soil")
+pairs(m1)
+```
+
+Fig. 2A
+
+```r
+plot1 <- ggplot(div.df.H, aes(x = Soil, y = PD, fill = Soil)) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "Phylogenetic diversity") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#d73027", "#fee08b", "#1a9850"),
+                        breaks = c("Agricultural", "Margin", "Prairie"),
+                        labels=c("Agricultural", "Margin", "Prairie"),
+                                      guide = "none")
+```
+<img width="421" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/b9c643a8-afb1-448b-9bf5-dc9cfdec9296">
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+```r
+
+```
+
+
+
+
+
+
