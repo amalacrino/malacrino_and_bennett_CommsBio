@@ -557,36 +557,186 @@ px <- ggpubr::ggarrange(a, b, c, ncol = 3, nrow = 1, align = "hv", common.legend
 ```
 <img width="1290" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/c4d87281-3927-4c94-9c88-5c160bb5ff8c">
 
+## MNTD
 
-
-```r
-
-```
-
-
+Code for: Fig. 2C, Tab. 4, and Figs. S7-S10.
 
 ```r
+mntd.calc <- function(ps){
+  comm <- as.data.frame(t(otu_table(ps)))
+  phy <- phy_tree(ps)
+  phy.dist <- cophenetic(phy)
+  comm.sesmpd <- ses.mntd(comm, phy.dist, null.model = "richness", abundance.weighted = T, runs = 999)
+  ks <- sample_data(ps)
+  bnti <- cbind(ks, comm.sesmpd)
+  return(bnti)
+}
 
+mntd.df <- mntd.calc(ps.16S)
+mntd.df.H <- mntd.df[which(mntd.df$Compartment == "Herbivore"),]
+mntd.df.L <- mntd.df[which(mntd.df$Compartment == "Leaves"),]
+mntd.df.R <- mntd.df[which(mntd.df$Compartment == "Roots"),]
+mntd.df.S <- mntd.df[which(mntd.df$Compartment == "Soil"),]
 ```
 
+### Model, post-hoc, and plot for rhizosphere samples.
 
+Tab. S4 and Fig. S7.
 
 ```r
+model <- lmer(mntd.obs ~ Soil * Herbivore * Treatment * (1|Block), data = mntd.df.S)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
 
+b_plot <- ggplot(mntd.df.S, aes(x = Herbivore, y = mntd.obs, fill = Herbivore)) +
+                      facet_grid(Treatment ~ Soil) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
 ```
+<img width="1205" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/84b45969-9b8e-4f6b-ba94-d8525132674c">
 
+### Model, post-hoc, and plot for root samples.
 
+Tab. S4 and Fig. S8.
 
 ```r
+model <- lmer(mntd.obs ~ Soil * Herbivore * Treatment * (1|Block), data = mntd.df.R)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
+
+b_plot <- ggplot(mntd.df.R, aes(x = Herbivore, y = mntd.obs, fill = Herbivore)) +
+                      facet_grid(Treatment ~ Soil) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
 
 ```
+<img width="1205" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/2c576e03-7c1c-4a09-99bd-40ad79c30a95">
 
-
+Fig. S10.
 
 ```r
+m1 <- emmeans(model, "Soil")
+pairs(m1)
+b_plot1 <- ggplot(mntd.df.R, aes(x = Soil, y = mntd.obs, fill = Soil)) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#d73027", "#fee08b", "#1a9850"),
+                        breaks = c("Agricultural", "Margin", "Prairie"),
+                        labels=c("Agricultural", "Margin", "Prairie"),
+                                      guide = "none") 
 
+m1 <- emmeans(model, "Treatment")
+pairs(m1)
+
+b_plot2 <- ggplot(mntd.df.R, aes(x = Treatment, y = mntd.obs, fill = Treatment)) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#b3b3b3", "#8da0cb"),
+                                      breaks = c("Covered", "Uncovered"),
+                                      labels=c("Covered", "Uncovered"),
+                                      guide = "none") 
+px <- ggpubr::ggarrange(b_plot1, b_plot2, ncol = 2, nrow = 1, align = "hv", common.legend = T)
 ```
+<img width="1205" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/9de5f41a-3cdb-43c4-9c18-1618d3ec9495">
 
+### Model, post-hoc, and plot for leaf samples.
+
+Tab. S4 and Fig. S9.
+
+```r
+model <- lmer(mntd.obs ~ Soil * Herbivore * Treatment * (1|Block), data = mntd.df.L)
+Anova(model)
+m1 <- emmeans(model, "Herbivore", by = c("Soil", "Treatment"))
+pairs(m1)
+
+b_plot <- ggplot(mntd.df.L, aes(x = Herbivore, y = mntd.obs, fill = Herbivore)) +
+                      facet_grid(Treatment ~ Soil) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#ff7f00", "#377eb8"),
+                                      breaks = c("Present", "Absent"),
+                                      labels=c("Present", "Absent"),
+                                      guide = "none")
+```
+<img width="1205" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/a1256d4a-3faf-4e8f-b516-a2bab6a3ed97">
+
+### Model, post-hoc, and plot for herbivore samples.
+
+Tab. S4 and Fig. 2C
+
+```r
+model <- lmer(mntd.obs ~ Soil * Treatment * (1|Block), data = mntd.df.H)
+Anova(model)
+m1 <- emmeans(model, "Soil")
+pairs(m1)
+
+b_plot <- ggplot(mntd.df.H, aes(x = Soil, y = mntd.obs, fill = Soil)) +
+                      theme_bw(base_size = 15) +
+                      geom_boxplot(outlier.colour="black", notch=F, outlier.shape=NA) +
+                      labs(y = "MNTD") +
+                      theme(axis.title.x=element_blank(),
+                            axis.text.x = element_text(color="black"),
+                            axis.text.y = element_text(color="black"),
+                            axis.title.y = element_text(color="black"),
+                            panel.grid = element_blank(),
+                            strip.background = element_blank(),
+                            legend.position = "none") +
+                    scale_fill_manual(values=c("#d73027", "#fee08b", "#1a9850"),
+                        breaks = c("Agricultural", "Margin", "Prairie"),
+                        labels=c("Agricultural", "Margin", "Prairie"),
+                                      guide = "none") 
+```
+<img width="476" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/8a609d6f-bbcb-4835-af1f-f6fb0c3dae09">
 
 
 ```r
