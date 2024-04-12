@@ -51,63 +51,6 @@ FastTree -gtr -nt < asv_aligned.fasta > tree.tre
 
 # Data analysis
 
-## Load libraries
-
-```r
-library("phyloseq")
-library("ggplot2")
-library("scales")
-library("grid")
-library("DESeq2")
-library("vegan")
-library("ape")
-library("plyr") 
-library("ggrepel")
-library("dplyr")
-library("broom")
-library("picante")
-library("Rmisc")
-library("emmeans")
-library("car")
-library("lme4")
-library("tibble")
-library("data.table")
-library("limma")
-library("microbiome")
-library("ggvenn")
-library("patchwork")
-library("RColorBrewer")
-library("RVAideMemoire")
-library("data.table")
-library("MuMIn")
-```
-
-## Load and clean microbiome data
-
-```r
-asv.table <- as.matrix(read.table('data/ASV_table.tsv', sep = "\t", header = T, row.names = 1))
-tax.table <- as.matrix(read.table('data/ASV_tax_species.tsv', sep = "\t", header = T, row.names = 1)[,c(2:8)])
-mapping <- read.table('data/metadata.txt', sep = "\t", header = T, row.names = 1)
-tree <- read.tree('data/tree.tre')
-
-ps.16S <- phyloseq(otu_table(asv.table, taxa_are_rows = T), 
-                         sample_data(mapping), 
-                         tax_table(tax.table), 
-                         phy_tree(tree))
-
-ps.16S <- subset_taxa(ps.16S, Class !="Chloroplast")
-ps.16S <- subset_taxa(ps.16S, Order !="Chloroplast")
-ps.16S <- subset_taxa(ps.16S, Family !="Mitochondria")
-
-ps.16S <- subset_samples(ps.16S, Compartment != "Control") 
-ps.16S <- subset_samples(ps.16S, Soil != "No_treatment") 
-ps.16S <- filter_taxa(ps.16S, function (x) {sum(x > 0) > 1}, prune=TRUE)
-ps.16S.L <- subset_samples(ps.16S, Compartment == "Leaves") 
-ps.16S.R <- subset_samples(ps.16S, Compartment == "Roots") 
-ps.16S.S <- subset_samples(ps.16S, Compartment == "Soil") 
-ps.16S.H <- subset_samples(ps.16S, Compartment == "Herbivore")
-```
-
 ## Phylogenetic diversity
 
 Code for: Fig. 2A, Tab. S1, and Figs. S1-S3.
