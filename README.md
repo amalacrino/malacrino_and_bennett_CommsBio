@@ -1026,83 +1026,47 @@ ggvenn(list.venn)
 ```
 <img width="420" alt="image" src="https://github.com/amalacrino/malacrino_and_bennett_CommsBio/assets/21124426/7c5fe4d7-3f74-4763-b21f-9a0540ca02b4">
 
+## SEM
+
+Code for: Fig. 6.
 
 ```r
+library("tidyverse")
+library("piecewiseSEM")
 
+sem.dataset <- read.table('data/biomass.txt', sep = "\t", header = T)
+
+mds.calc <- function(ps, y){
+  sampledf <- data.frame(sample_data(ps.16S.L)) %>% tibble::rownames_to_column("sample")
+  dist.mat <- phyloseq::distance(ps.16S.L, method = "unifrac")
+  cap_ord <- ordinate(physeq = ps.16S.L, method = "NMDS", distance = dist.mat, formula = ~ 1)$points %>% as.data.frame %>% tibble::rownames_to_column("sample")
+  cap_ord <- merge(sampledf, cap_ord, by = "sample")[,c(3,9)]
+  colnames(cap_ord) <- c("plantID", paste0("MDS1_", y))
+  return(cap_ord)
+}
+
+nmds.H <- mds.calc(ps.16S.H, "herbivore")
+nmds.L <- mds.calc(ps.16S.L, "leaves")
+nmds.R <- mds.calc(ps.16S.R, "roots")
+nmds.S <- mds.calc(ps.16S.S, "soil")
+df_list <- list(nmds.H, nmds.L, nmds.R, nmds.S)
+nmds.all <- df_list %>% reduce(full_join, by='plantID')
+sem.dataset <- merge(sem.dataset, nmds.all, by = "plantID")
+sem.dataset <- as_tibble(sem.dataset)
+sem.dataset$soil <- as.numeric(factor(sem.dataset$soil))
+sem.dataset$herbivore <- as.numeric(factor(sem.dataset$herbivore))
+sem.dataset$cover <- as.numeric(factor(sem.dataset$treatment))
+
+modelList <- psem(
+  lmer(shoot_biomass ~ cover + soil + herbivore + MDS1_leaves + MDS1_soil + MDS1_roots + (1|Block), sem.dataset),
+  lmer(root_biomass ~ cover + soil + herbivore + MDS1_roots + MDS1_soil + (1|Block), sem.dataset),
+  lmer(insect_biomass ~  cover + soil + MDS1_leaves + MDS1_soil + MDS1_roots + MDS1_herbivore + (1|Block), sem.dataset),
+  lmer(MDS1_soil ~ cover + soil + herbivore + (1|Block), sem.dataset),
+  lmer(MDS1_roots ~ MDS1_soil + MDS1_leaves + cover + soil + herbivore + (1|Block), sem.dataset),
+  lmer(MDS1_leaves ~ MDS1_soil + MDS1_roots + cover + soil + herbivore + (1|Block), sem.dataset),
+  lmer(MDS1_herbivore ~ MDS1_soil + MDS1_roots + MDS1_leaves + cover + soil + (1|Block), sem.dataset)
+)
+
+a <- coefs(modelList)
+plot(modelList, alpha = 0.05)
 ```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-```r
-
-```
-
-
-
-
-
-
